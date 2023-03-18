@@ -13,18 +13,23 @@ from VkParser import VkParser
 
 class BotServer:
     def __init__(self, bot: aiogram.Bot, db: DataBaseServer, vk_parser: VkParser, keyboard_generator: KeyboardGenerator,
-                 standard_answer: dict, file_directory: str = ''):
+                 standard_answer: dict, file_directory: str = '', posts_storage_channel: int = -1001954413154):
         self.vk_parser = vk_parser
         self.keyboard_generator = keyboard_generator
         self.bot = bot
         self.db = db
         self.standard_answer = standard_answer
         self.file_directory = file_directory
+        self.posts_storage_channel = posts_storage_channel
 
     async def processing_command_start(self, user_id, user_name):
         await self.bot.send_message(user_id, f"{user_name} {self.standard_answer['start_massage']}",
                                     reply_markup=self.keyboard_generator.create_start_command_ikb(
                                         [self.standard_answer['btn_1'], self.standard_answer['btn_1']]))
+
+    async def save_post_in_storage_channel(self, kwargs: dict[any]):
+        if 'reply_media_message' in kwargs:
+            pass
 
     async def processing_add_token(self, user_id, token, standard_token_name='акк'):
         if self.vk_parser.check_correct_token(token):
@@ -104,48 +109,61 @@ class BotServer:
         args = {'chat_id': user_id, 'media': media_message[0]}
         if copy_history_flag:
             reply_message = 0
-            reply_post_start_message = self.constructs_post_start_message(reply_public_name, reply_post_date)
+            reply_post_start_message = self.constructs_post_start_message(reply_public_name, reply_post_date, True)
             if len(reply_media_message[0].media) > 0:
                 await self.bot.send_message(user_id, reply_post_start_message)
                 reply_message = await self.bot.send_media_group(user_id, reply_media_message[0])
+                reply_message = reply_message[0]
+                for post_message in reply_media_message[3]:
+                    reply_message = await self.bot.send_message(user_id, post_message,
+                                                                reply_to_message_id=reply_message.message_id)
+
             elif reply_media_message[1]:
                 await self.bot.send_message(user_id, reply_post_start_message)
                 reply_message = await self.bot.send_message(user_id, reply_media_message[1][0])
             if reply_message:
-                args['reply_to_message_id'] = reply_message[0].message_id
+                args['reply_to_message_id'] = reply_message.message_id
 
         start_message = self.constructs_post_start_message(self.db.get_public_name_by_id(public_id), post_date)
         if len(media_message[0].media) > 0:
             await self.bot.send_message(user_id, start_message)
-            await self.bot.send_media_group(**args)
+            reply_message = await self.bot.send_media_group(**args)
+            reply_message = reply_message[0]
+            for post_message in media_message[3]:
+                reply_message = await self.bot.send_message(user_id, post_message,
+                                                            reply_to_message_id=reply_message.message_id)
+
             await self.bot.send_message(**args_2)
         elif media_message[1]:
             args['text'] = media_message[1][0]
             args.pop('media')
             await self.bot.send_message(user_id, start_message)
-            await self.bot.send_message(**args)
+            reply_message = await self.bot.send_message(**args)
+            for post_message in media_message[3]:
+                reply_message = await self.bot.send_message(user_id, post_message,
+                                                            reply_to_message_id=reply_message.message_id)
             await self.bot.send_message(**args_2)
 
-    async def mailing_posts(self, public_id, posts, users_data, token):
-        max_id = max([i['id'] for i in posts])
-        self.db.update_public_last_post_id(public_id, max_id)
+    async def mailing_posts(self, public_id, posts, users_data, token, db_update=True):
+
+        if db_update:
+            max_id = max([i['id'] for i in posts])
+            self.db.update_public_last_post_id(public_id, max_id)
         for post_num in range(len(posts)):
             copy_history_flag, reply_media_message, reply_post_date, reply_public_name = False, None, None, None
             if 'copy_history' in posts[post_num]:
                 copy_history_flag = True
-                reply_post_date = posts[post_num]['copy_history']['date']
-                reply_public_info_data = self.vk_parser.get_info_group(-posts[post_num]['copy_history']['owner_id'],
-                                                                       token)
-                if type(reply_public_info_data) == bool:
-                    reply_public_name = '(не получилось определить)'
-                else:
+                try:
+                    reply_public_info_data = self.vk_parser.get_info_group(-posts[post_num]['copy_history']['owner_id'],
+                                                                           token)
                     reply_public_name = reply_public_info_data[1]
+                except BaseException:
+                    reply_public_name = '(страницы пользователя)'
+                reply_post_date = posts[post_num]['copy_history']['date']
                 reply_media_message = self.return_media_message(posts[post_num]['copy_history'],
-                                                                -posts[post_num]['copy_history']['owner_id'],
-                                                                reply_public_info_data[2])
+                                                                -posts[post_num]['copy_history']['owner_id'])
             post_id = posts[post_num]['id']
-            public_info_data = self.vk_parser.get_info_group(public_id, token)
-            media_message = self.return_media_message(posts[post_num], public_id, public_info_data[2])
+            media_message = self.return_media_message(posts[post_num], public_id)
             post_date = posts[post_num]['date']
             for user in users_data:
                 user_id = user[0]
@@ -173,6 +191,17 @@ class BotServer:
             if time_end_cycle - time_start_cycle < min_time_sleep:
                 await asyncio.sleep(min_time_sleep - time_end_cycle + time_start_cycle)
 
+    async def get_manual_token_message(self, user_id):
+        media = MediaGroup()
+        photos = [
+            '1', '2', '3', '4', '5'
+        ]
+        for photo in photos:
+            media.attach_photo(
+                InputFile(f"{self.file_directory}instructions/{photo}.png"))
+        media.media[0].caption = self.standard_answer['manual_get_token_message']
+        await self.bot.send_media_group(user_id, media=media)
+
     async def processing_add_message(self, user_id, message):
         self.db.add_message(user_id, message)
         await self.bot.send_message(user_id, self.standard_answer['massage_1'])
@@ -195,9 +224,9 @@ class BotServer:
         except Exception:
             return False
 
-    def return_media_message(self, post, group_id, group_name):
+    def return_media_message(self, post, group_id):
         media = MediaGroup()
-        res = [media, [], []]
+        res = [media, [], [], []]
         if 'attachments' in post:
             for element in post['attachments']:
                 if element['type'] == 'photo':
@@ -205,16 +234,29 @@ class BotServer:
                     media.attach_photo(
                         InputFile(self.save_photo(photos[-1]['url'], group_id, element['photo']['id'])))
                 elif element['type'] == 'video':
+                    ###1!!!
                     video_element = element['video']
                     res[2].append(
-                        f'https://vk.com/{group_name}?z=video{video_element["owner_id"]}_{video_element["id"]}')
+                        f'https://vk.com/group_name?z=video{video_element["owner_id"]}_{video_element["id"]}')
                     res[2].append(f'owner_id id')
                 try:
-                    media.media[0].caption = post['text']
+                    if len(post['text']) > 1024:
+                        media.media[0].caption = post['text'][0:1024]
+                        t = post['text'][1024:1024 * 5]
+                        for i in range(1 + len(t) // (1024 * 4)):
+                            res[3].append(t[i * (1024 * 4):(i + 1) * (1024 * 4)])
+                    else:
+                        media.media[0].caption = post['text']
                 except:
                     pass
         if 'text' in post and post['text']:
-            res[1].append(post['text'])
+            if len(post['text']) > 1024 * 4:
+                res[1].append(post['text'][0:1024 * 4])
+                t = post['text'][1024 * 4:1024 * 8]
+                for i in range(1 + len(t) // (1024 * 4)):
+                    res[3].append(t[i * (1024 * 4):(i + 1) * (1024 * 4)])
+            else:
+                res[1].append(post['text'])
         if 'copy_history' in post:
             res[2].append('-' * 5 + 'Упоминание другого поста' + '-' * 5)
         return res

@@ -53,13 +53,14 @@ class DataBaseServer:
 
     def check_have_subscribers_public(self, public_id) -> bool:
         res = self.cur.execute(
-            f"SELECT user_id FROM Subscriptions WHERE public_id={public_id}").fetchall()[0]
+            f"SELECT user_id FROM Subscriptions WHERE public_id={public_id}").fetchall()
         if res:
             return True
         return False
 
     def check_user_subscribers(self, user_id, public_id) -> bool:
-        res = self.cur.execute(f"SELECT user_id FROM Subscriptions WHERE public_id={public_id} and user_id={user_id}").fetchall()
+        res = self.cur.execute(
+            f"SELECT user_id FROM Subscriptions WHERE public_id={public_id} and user_id={user_id}").fetchall()
         if res:
             return True
         return False

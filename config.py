@@ -52,10 +52,14 @@ Bot_responses = {
     'success_rename_token_massage': 'Вы удачно поменяли название для токена!',
     'dell_token_success_message': 'Вы удачно удалили токен',
     'invalid_url_vk': 'К сожалению не получилось запарсить эту группу',
+    'manual_get_token_message': '1) Нажмите на кнопку "Создать токен"\n2) повторяйте за фотографиями\n'
+                                '3) скопируйте ссылку корректно и добавьте её в бота',
 
 }
 
 vk_standard_token = 'vk1.a.hXGwmFB9tAOv1ja7rkz91fgKS8o5OIaP1a62zd2OLTJOSV8Bq19CWKtcwInUmAklsA_RSaBGJ0kamvUAG2Kemo39VykdmZdaH9q523j8WC05ZUkHuqAGlS2CJqxdfJModcyFXELKxZfR7Q3zo_6V5CNyq4Zhvwr_Qph4VlWpKg18gGCBIgt4RD0lMk5kRdAcpKOf1UPAaUlSESMAhqRKmA'
+
+chanel_id = -1001954413154
 
 
 def return_changeable_message(group_id, post_id):

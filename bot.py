@@ -39,11 +39,19 @@ async def process_start_command(msg: types.Message) -> None:
 @dp.callback_query_handler(main_action_cb.filter(action='help'))
 async def callback_help(callback: types.CallbackQuery) -> None:
     await callback.answer(Bot_responses['manual_massage_1'], show_alert=True)
+    await bot.answer_callback_query(callback.id)
+
+
+@dp.callback_query_handler(main_action_cb.filter(action='manual_get_token'))
+async def callback_manual_get_token(callback: types.CallbackQuery) -> None:
+    await bot_server.get_manual_token_message(callback.from_user.id)
+    await bot.answer_callback_query(callback.id)
 
 
 @dp.callback_query_handler(main_action_cb.filter(action='add_answer'))
 async def callback_add_answer(callback: types.CallbackQuery) -> None:
     await bot.send_message(callback.from_user.id, Bot_responses['add_answer_massage_1'])
+    await bot.answer_callback_query(callback.id)
 
 
 @dp.callback_query_handler(main_action_cb.filter(action='rename_token'))
@@ -52,11 +60,13 @@ async def callback_dell_token(callback: types.CallbackQuery) -> None:
     large_buttons_data = [[token_data[3], 'rename_token', token_data[0]] for token_data in tokens]
     await bot.send_message(callback.from_user.id, Bot_responses['rename_token_message'],
                            reply_markup=keyboard_generator.create_multiple_choice_ikb(large_buttons_data))
+    await bot.answer_callback_query(callback.id)
 
 
 @dp.callback_query_handler(main_action_cb.filter(action='add_token'))
 async def callback_add_token(callback: types.CallbackQuery) -> None:
     await callback.message.answer(Bot_responses['add_token_message'])
+    await bot.answer_callback_query(callback.id)
 
 
 @dp.callback_query_handler(main_action_cb.filter(action='sett_token'))
@@ -70,6 +80,7 @@ async def callback_sett_token(callback: types.CallbackQuery) -> None:
     keyboard_generator.create_main_action_or_link_ikb(buttons_link_data)
     await bot.send_message(callback.from_user.id, Bot_responses['need_token_1'],
                            reply_markup=keyboard_generator.create_main_action_or_link_ikb(buttons_link_data))
+    await bot.answer_callback_query(callback.id)
 
 
 @dp.callback_query_handler(main_action_cb.filter(action='sett_public'))
@@ -92,6 +103,7 @@ async def callback_sett_public(callback: types.CallbackQuery) -> None:
             ]
             await bot.send_message(callback.from_user.id, Bot_responses['setting_public_message_1'],
                                    reply_markup=keyboard_generator.create_multiple_choice_ikb(large_buttons_data))
+    await bot.answer_callback_query(callback.id)
 
 
 @dp.callback_query_handler(main_action_cb.filter(action='dell_answer'))
@@ -100,6 +112,7 @@ async def callback_dell_answer(callback: types.CallbackQuery) -> None:
     for i in range(len(answers)):
         await bot.send_message(callback.from_user.id, answers[i][1],
                                reply_markup=keyboard_generator.create_dell_message_ikb([answers[i]]))
+    await bot.answer_callback_query(callback.id)
 
 
 @dp.callback_query_handler(dell_massage_cb.filter())
@@ -107,6 +120,7 @@ async def callback_add_answer(callback: types.CallbackQuery) -> None:
     answer_data = [int(i) for i in callback.data.split(':')[1].split('_')][0]
     database_server.dell_message_by_id(answer_data)
     await bot.delete_message(callback.from_user.id, callback.message.message_id)
+    await bot.answer_callback_query(callback.id)
 
 
 @dp.callback_query_handler(multiple_choice_cb.filter(filter='view_group'))
@@ -120,6 +134,16 @@ async def callback_view_id_group(callback: types.CallbackQuery) -> None:
     ]
     ikb = keyboard_generator.create_multiple_choice_ikb(large_buttons_data)
     await bot_server.send_photo(callback.from_user.id, group_id, 'main', group_name, ikb)
+    await bot.answer_callback_query(callback.id)
+
+
+@dp.callback_query_handler(multiple_choice_cb.filter(filter='get_post s'))
+async def callback_get_posts(callback: types.CallbackQuery) -> None:
+    data = [int(i) for i in callback.data.split(':')[-1].split('_')]
+    user_token_id = database_server.get_token_id_by_public(data[1], callback.from_user.id)
+    user_token = database_server.get_token_by_id(user_token_id)
+    posts = bot_server.vk_parser.get_new_post(data[1], 0, user_token, data[0])
+    await bot_server.mailing_posts(data[1], posts, [[callback.from_user.id, user_token_id]], user_token, False)
 
 
 @dp.callback_query_handler(multiple_choice_cb.filter(filter='unsubscribe'))
@@ -128,18 +152,21 @@ async def callback_unsubscribe(callback: types.CallbackQuery) -> None:
     database_server.dell_subscription(callback.from_user.id, group_id)
     await callback.answer(Bot_responses['unsubscribe_success_message'], show_alert=True)
     await bot.delete_message(callback.from_user.id, callback.message.message_id)
+    await bot.answer_callback_query(callback.id)
 
 
 @dp.callback_query_handler(multiple_choice_cb.filter(filter='rename_token'))
 async def callback_rename_token(callback: types.CallbackQuery) -> None:
     await bot.send_message(callback.from_user.id, config.return_change_token_name(callback.data.split(':')[-1]),
                            parse_mode='HTML')
+    await bot.answer_callback_query(callback.id)
 
 
 @dp.callback_query_handler(multiple_choice_cb.filter(filter='choice_token'))
 async def callback_choice_token(callback: types.CallbackQuery) -> None:
     data = [int(i) for i in callback.data.split(':')[-1].split('_')]
     await bot_server.processing_choice_subscriber_token(callback.from_user.id, data[0], data[1], callback)
+    await bot.answer_callback_query(callback.id)
 
 
 @dp.callback_query_handler(quick_answer_cb.filter())
@@ -147,6 +174,7 @@ async def callback_choice_comment(callback: types.CallbackQuery) -> None:
     data = [int(i) for i in callback.data.split(':')[-1].split('_')]
     await bot_server.processing_create_comment(callback.from_user.id, data[0], data[1],
                                                database_server.get_message_by_id(data[2]))
+    await bot.answer_callback_query(callback.id)
 
 
 @dp.message_handler(lambda msg: msg.reply_to_message and msg.reply_to_message.from_id == Telegram_bot_id)
