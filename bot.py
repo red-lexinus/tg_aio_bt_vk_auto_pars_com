@@ -137,7 +137,7 @@ async def callback_view_id_group(callback: types.CallbackQuery) -> None:
     await bot.answer_callback_query(callback.id)
 
 
-@dp.callback_query_handler(multiple_choice_cb.filter(filter='get_post s'))
+@dp.callback_query_handler(multiple_choice_cb.filter(filter='get_posts'))
 async def callback_get_posts(callback: types.CallbackQuery) -> None:
     data = [int(i) for i in callback.data.split(':')[-1].split('_')]
     user_token_id = database_server.get_token_id_by_public(data[1], callback.from_user.id)
@@ -212,6 +212,7 @@ async def answer_message(msg: types.Message) -> None:
     elif 'vk.com' in msg.text:
         vk_public_name = msg.text.split('vk.com/')[1].split('?')[0]
         await bot_server.processing_subscription(msg.from_user.id, vk_public_name)
+
 
 
 if __name__ == '__main__':

@@ -20,8 +20,56 @@ class DataBaseServer:
         self.cur.execute(
             "CREATE TABLE IF NOT EXISTS Subscriptions(subscription_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,"
             " user_id INTEGER, public_id INTEGER, token_id INTEGER)")
+        self.cur.execute(
+            "CREATE TABLE IF NOT EXISTS StoragePosts(storage_post_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,"
+            " public_id INTEGER, post_id INTEGER, forwarded_post_id INTEGER)")
+
+        self.cur.execute(
+            "CREATE TABLE IF NOT EXISTS StorageMessage(storage_message_id INTEGER PRIMARY KEY NOT NULL,"
+            " storage_post_id INTEGER, message_position INTEGER)")
 
         self.db.commit()
+
+    def get_storage_post_id(self, public_id: int, post_id: int) -> int:
+        storage_post_id = 0
+        storage_post_data = self.cur.execute(f"SELECT storage_post_id FROM StoragePosts WHERE "
+                                             f"public_id={public_id} and post_id={post_id}").fetchall()
+        if storage_post_data:
+            storage_post_id = storage_post_data[0][0]
+        return storage_post_id
+
+    def get_storage_post_info(self, storage_post_id: int) -> dict[any]:
+        storage_post_info = self.cur.execute(f"SELECT public_id, post_id, forwarded_post_id FROM StoragePosts"
+                                             f" WHERE storage_post_id={storage_post_id}").fetchall()[0]
+        result = {
+            'public_id': storage_post_info[0], 'post_id': storage_post_info[1],
+            'forwarded_post_id': storage_post_info[2]
+        }
+        return result
+
+    def add_storage_post(self, public_id: int, post_id: int, forwarded_post_id: int or None = None) -> int:
+        if self.get_storage_post_id(public_id, post_id) == 0:
+            self.cur.execute(f"INSERT INTO StoragePosts(public_id, post_id, forwarded_post_id) VALUES (?, ?, ?)",
+                             [public_id, post_id, forwarded_post_id])
+            self.db.commit()
+            return self.get_storage_post_id(public_id, post_id)
+        return 0
+
+    def get_forwarded_post_id(self, storage_post_id: int) -> int or None:
+        storage_post_data = self.cur.execute(f"SELECT storage_post_id FROM StoragePosts WHERE "
+                                             f"storage_post_id={storage_post_id}").fetchall()
+        return storage_post_data[0][0]
+
+    def add_storage_message(self, storage_message_id: int, storage_post_id: int, message_position: int) -> None:
+        self.cur.execute('INSERT INTO StorageMessage(storage_message_id, storage_post_id, message_position)'
+                         ' VALUES (?, ?, ?)', [storage_message_id, storage_post_id, message_position])
+        self.db.commit()
+
+    def get_storage_message_by_post_id(self, storage_post_id: int) -> list[dict[str:int]]:
+        messages = self.cur.execute(f"SELECT storage_message_id, message_position FROM StorageMessage WHERE "
+                                    f"storage_post_id={storage_post_id}").fetchall()
+        messages = [{'storage_message_id': message[0], 'message_position': message[1]} for message in messages]
+        return messages
 
     def add_subscription(self, user_id, public_id, token_id) -> None:
         self.cur.execute('INSERT INTO Subscriptions(user_id, public_id, token_id) VALUES (?, ?, ?)',
